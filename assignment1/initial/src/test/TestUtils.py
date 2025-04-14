@@ -1,13 +1,31 @@
 import sys,os
 from antlr4 import *
 from antlr4.error.ErrorListener import ConsoleErrorListener,ErrorListener
-if not './main/minigo/parser/' in sys.path:
-    sys.path.append('./main/minigo/parser/')
-if os.path.isdir('../target/main/minigo/parser') and not '../target/main/minigo/parser/' in sys.path:
-    sys.path.append('../target/main/minigo/parser/')
-from MiniGoLexer import MiniGoLexer
-from MiniGoParser import MiniGoParser
-from lexererr import *
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parser_path = os.path.abspath(os.path.join(current_dir, 'main', 'minigo', 'parser'))
+target_path = os.path.abspath(os.path.join(current_dir, '..', 'target', 'main', 'minigo', 'parser'))
+
+# Thêm vào sys.path nếu chưa có
+if parser_path not in sys.path:
+    sys.path.insert(0, parser_path)
+if os.path.isdir(target_path) and target_path not in sys.path:
+    sys.path.insert(0, target_path)
+
+# Debug
+print(f"Importing from: {parser_path}")
+print(f"Target path: {target_path}")
+
+# Import thử
+try:
+    from MiniGoLexer import MiniGoLexer
+    from MiniGoParser import MiniGoParser
+    from lexererr import ErrorToken, UncloseString, IllegalEscape
+    print("All imports successful!")
+except ImportError as e:
+    print(f"Import error: {e}")
+    print(f"Current sys.path: {sys.path}")
+    raise
+
 import difflib
 
 class TestUtil:
@@ -42,6 +60,7 @@ class TestLexer:
             TestLexer.printLexeme(dest,lexer,",")
         except (ErrorToken,UncloseString,IllegalEscape) as err:
             dest.write(err.message)
+            print(err.message)
         except Exception as err:
             dest.write(str(err)+"\n")
         finally:

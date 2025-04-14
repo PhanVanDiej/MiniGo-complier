@@ -15,7 +15,13 @@ def main(argv):
     elif argv[0] == 'gen':
         subprocess.run(["java","-jar",ANTLR_JAR,"-o","../target","-no-listener","-visitor","main/minigo/parser/MiniGo.g4"])
     elif argv[0] == 'clean':
-        subprocess.run(["rm","-rf","../target/main"])
+        import shutil
+        target_path = os.path.normpath("../target/main")
+        if os.path.exists(target_path):
+            shutil.rmtree(target_path)
+            print(f"Removed {target_path}")
+        else:
+            print(f"{target_path} does not exist")
     elif argv[0] == '-assign1':
         from TestUtils import TestLexer,TestParser
         lexstart = int(argv[1])
