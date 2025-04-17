@@ -344,9 +344,9 @@ class LexerSuite(unittest.TestCase):
         """Test string with illegal escape"""
         self.assertTrue(TestLexer.checkLexeme('"Hello\\k"', 'Illegal Escape In string: "Hello\\k', 183))
     
-    # def test_string_with_newline(self):
-    #     """Test string with newline"""
-    #     self.assertTrue(TestLexer.checkLexeme('"Hello\nWorld"', 'Unclosed string: "Hello', 184))
+    def test_string_with_newline(self):
+        """Test string with newline"""
+        self.assertTrue(TestLexer.checkLexeme('"Hello\nWorld"', 'Unclosed string: "Hello\n', 184))
     
     def test_unclosed_string_eof(self):
         """Test unclosed string at end of file"""
@@ -360,9 +360,9 @@ class LexerSuite(unittest.TestCase):
         """Test escape backslash in string"""
         self.assertTrue(TestLexer.checkLexeme('"Hello\\\\"', '"Hello\\\\",<EOF>', 187))
     
-    # def test_illegal_escape_octal(self):
-    #     """Test illegal escape octal in string"""
-    #     self.assertTrue(TestLexer.checkLexeme('"Hello\\123"', 'Illegal Escape In string: "Hello\123', 188))
+    def test_illegal_escape_octal(self):
+        """Test illegal escape octal in string"""
+        self.assertTrue(TestLexer.checkLexeme('"Hello\\123"', r'Illegal Escape In string: "Hello\123', 188))
     
     def test_unclosed_string_with_valid_tokens(self):
         """Test unclosed string with valid tokens"""

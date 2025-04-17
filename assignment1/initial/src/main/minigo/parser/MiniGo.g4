@@ -291,13 +291,9 @@ ILLEGAL_ESCAPE:
     
 fragment ESC_SEQ: '\\' [btnfr"'\\];
 UNCLOSE_STRING:
-    '"' (~["\r\n\\] | ESCAPED_CHAR)* EOF
-    {
-        raise UncloseString(self.text[0:])
-    }
-    |
-    '"' (~["\r\n\\] | ESCAPED_CHAR)* [\r\n]
-    {
-        raise UncloseString(self.text[0:])
-    }
-    ;
+	'"' (ESC_SEQ | ~["\\\r\n])* (EOF | [\r\n]) {
+        text = self.text
+        if text.endswith('\n') or text.endswith('\r\n'):
+            text = text[:-1]
+        raise UncloseString(text)
+    };
