@@ -1,4 +1,4 @@
-from AST import FloatType, IntType, VoidType
+from AST import BoolType, FloatType, IntType, StringType, VoidType
 from StaticError import (
     Function,
     Identifier,
@@ -53,6 +53,15 @@ class StaticChecker(BaseVisitor, Utils):
             Symbol("putInt", MType([IntType()], VoidType())),
             Symbol("putIntLn", MType([IntType()], VoidType())),
             Symbol("getFloat", MType([], FloatType())),
+            Symbol("putFloat", MType([FloatType()], VoidType())),
+            Symbol("putFloatLn", MType([FloatType()], VoidType())),
+            Symbol("getBool", MType([], BoolType())),
+            Symbol("putBool", MType([BoolType()], VoidType())),
+            Symbol("putBoolLn", MType([BoolType()], VoidType())),
+            Symbol("getString", MType([], StringType())),
+            Symbol("putString", MType([StringType()], VoidType())),
+            Symbol("putStringLn", MType([StringType()], VoidType())),
+            Symbol("putLn", MType([], VoidType())),
         ]
 
     def check(self):
