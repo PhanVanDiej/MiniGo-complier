@@ -3,6 +3,12 @@ from TestUtils import TestChecker
 from AST import (
     ArrayLiteral,
     ArrayType,
+    Assign,
+    Block,
+    ConstDecl,
+    FloatLiteral,
+    FloatType,
+    FuncDecl,
     Id,
     IntLiteral,
     IntType,
@@ -10,6 +16,7 @@ from AST import (
     StringLiteral,
     StringType,
     VarDecl,
+    VoidType,
 )
 
 
@@ -61,3 +68,58 @@ class CheckSuite(TestCase):
 
         expect = ""
         self.assertTrue(TestChecker.test(input, expect, 406))
+
+    def test_const_decl_type_mismatch(self):
+        input_ast = Program([ConstDecl("x", IntType(), FloatLiteral(3.14))])
+        expect = "Type Mismatch: ConstDecl(x,IntType,FloatLiteral(3.14))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 407))
+
+    def test_const_decl_correct(self):
+        input_ast = Program([ConstDecl("x", FloatType(), FloatLiteral(3.14))])
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 408))
+
+    def test_assign_type_mismatch(self):
+        input_ast = Program(
+            [
+                VarDecl("a", IntType(), IntLiteral(5)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(Id("a"), FloatLiteral(2.5))]),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: Assign(Id(a),FloatLiteral(2.5))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 409))
+
+    def test_assign_correct(self):
+        input_ast = Program(
+            [
+                VarDecl("a", IntType(), IntLiteral(1)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(Id("a"), IntLiteral(10))]),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 410))
+
+    def test_assign_to_const_should_fail(self):
+        input_ast = Program(
+            [
+                ConstDecl("a", IntType(), IntLiteral(1)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(Id("a"), IntLiteral(5))]),
+                ),
+            ]
+        )
+        expect = "Cannot Assign To Constant: a\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 411))

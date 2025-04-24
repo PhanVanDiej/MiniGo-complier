@@ -1,17 +1,21 @@
 from tokenize import String
-from typing import Final, override
+from typing import Final, final, override
 from AST import (
     AST,
     ArrayType,
     BoolType,
+    Expr,
     FloatType,
     Id,
     IntType,
     StringType,
     StructType,
+    Type,
     VoidType,
 )
 from StaticError import (
+    CannotAssignToConstant,
+    Constant,
     Function,
     Identifier,
     Redeclared,
@@ -57,6 +61,7 @@ class Symbol:
         )
 
 
+@final
 class StaticChecker(BaseVisitor, Utils):
     ast: AST
     global_envi: Final[list[Symbol]] = [
@@ -95,10 +100,12 @@ class StaticChecker(BaseVisitor, Utils):
             return Symbol(ast.varName, ast.varType, None)
 
         init_type = self.visit(ast.varInit, param)
+        if init_type is None:
+            raise TypeMismatch(ast)
+
         if ast.varType is None:
             ast.varType = init_type
-
-        if type(ast.varType) is not type(init_type):
+        elif type(ast.varType) is not type(init_type):
             raise TypeMismatch(ast)
 
         return Symbol(ast.varName, ast.varType, None)
@@ -109,7 +116,15 @@ class StaticChecker(BaseVisitor, Utils):
         if res is not None:
             raise Redeclared(Function(), ast.name)
 
+        local_scope = []
+        self.visit(ast.body, local_scope + param)
+
         return Symbol(ast.name, MType([], ast.retType))
+
+    @override
+    def visitBlock(self, ast, param):
+        for stmt in ast.member:
+            self.visit(stmt, param)
 
     @override
     def visitIntLiteral(self, ast, param) -> IntType:
@@ -191,3 +206,54 @@ class StaticChecker(BaseVisitor, Utils):
             raise Undeclared(Identifier(), ast.name)
 
         return res.mtype
+
+    @override
+    def visitConstDecl(self, ast, param) -> Symbol:
+        if self.lookup(ast.conName, param, lambda x: x.name):
+            raise Redeclared(Constant(), ast.conName)
+
+        init_type = self.visit(ast.iniExpr, param)
+        if init_type is None:
+            raise TypeMismatch(ast)
+
+        if ast.conType is None:
+            ast.conType = init_type
+        elif type(ast.conType) is not type(init_type):
+            raise TypeMismatch(ast)
+
+        return Symbol(ast.conName, ast.conType, ast.iniExpr)
+
+    @override
+    def visitAssign(self, ast, param):
+        if isinstance(ast.lhs, Id):
+            sym = self.lookup(ast.lhs.name, param, lambda x: x.name)
+            if sym is not None and isinstance(sym.value, Expr):
+                raise CannotAssignToConstant(ast.lhs.name)
+
+        lhs_type = self.visit(ast.lhs, param)
+        rhs_type = self.visit(ast.rhs, param)
+
+        if isinstance(lhs_type, VoidType):
+            raise TypeMismatch(ast)
+
+        if isinstance(lhs_type, ArrayType):
+            if not isinstance(rhs_type, ArrayType):
+                raise TypeMismatch(ast)
+
+            if len(lhs_type.dimens) != len(rhs_type.dimens):
+                raise TypeMismatch(ast)
+
+            lhs_elem_type = lhs_type.eleType
+            rhs_elem_type = rhs_type.eleType
+            if type(lhs_elem_type) is not type(rhs_elem_type) and not (
+                isinstance(lhs_elem_type, FloatType)
+                and isinstance(rhs_elem_type, IntType)
+            ):
+                raise TypeMismatch(ast)
+
+        elif type(lhs_type) is not type(rhs_type) and not (
+            isinstance(lhs_type, FloatType) and isinstance(rhs_type, IntType)
+        ):
+            raise TypeMismatch(ast)
+
+        return lhs_type
