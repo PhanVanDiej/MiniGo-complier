@@ -1,5 +1,5 @@
-.vs/**
-.vscode/**
+**/.vs/**
+**/.vscode/**
 **/__MACOSX/**
 **/__pycache__/**
 **/.DS_Store

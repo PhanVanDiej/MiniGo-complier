@@ -1,4 +1,16 @@
-from AST import BoolType, FloatType, IntType, StringType, VoidType
+from tokenize import String
+from typing import Final, override
+from AST import (
+    AST,
+    ArrayType,
+    BoolType,
+    FloatType,
+    Id,
+    IntType,
+    StringType,
+    StructType,
+    VoidType,
+)
 from StaticError import (
     Function,
     Identifier,
@@ -46,23 +58,25 @@ class Symbol:
 
 
 class StaticChecker(BaseVisitor, Utils):
-    def __init__(self, ast) -> None:
+    ast: AST
+    global_envi: Final[list[Symbol]] = [
+        Symbol("getInt", MType([], IntType())),
+        Symbol("putInt", MType([IntType()], VoidType())),
+        Symbol("putIntLn", MType([IntType()], VoidType())),
+        Symbol("getFloat", MType([], FloatType())),
+        Symbol("putFloat", MType([FloatType()], VoidType())),
+        Symbol("putFloatLn", MType([FloatType()], VoidType())),
+        Symbol("getBool", MType([], BoolType())),
+        Symbol("putBool", MType([BoolType()], VoidType())),
+        Symbol("putBoolLn", MType([BoolType()], VoidType())),
+        Symbol("getString", MType([], StringType())),
+        Symbol("putString", MType([StringType()], VoidType())),
+        Symbol("putStringLn", MType([StringType()], VoidType())),
+        Symbol("putLn", MType([], VoidType())),
+    ]
+
+    def __init__(self, ast: AST) -> None:
         self.ast = ast
-        self.global_envi = [
-            Symbol("getInt", MType([], IntType())),
-            Symbol("putInt", MType([IntType()], VoidType())),
-            Symbol("putIntLn", MType([IntType()], VoidType())),
-            Symbol("getFloat", MType([], FloatType())),
-            Symbol("putFloat", MType([FloatType()], VoidType())),
-            Symbol("putFloatLn", MType([FloatType()], VoidType())),
-            Symbol("getBool", MType([], BoolType())),
-            Symbol("putBool", MType([BoolType()], VoidType())),
-            Symbol("putBoolLn", MType([BoolType()], VoidType())),
-            Symbol("getString", MType([], StringType())),
-            Symbol("putString", MType([StringType()], VoidType())),
-            Symbol("putStringLn", MType([StringType()], VoidType())),
-            Symbol("putLn", MType([], VoidType())),
-        ]
 
     def check(self):
         return self.visit(self.ast, self.global_envi)
@@ -71,32 +85,109 @@ class StaticChecker(BaseVisitor, Utils):
         reduce(lambda acc, ele: [self.visit(ele, acc)] + acc, ast.decl, param)
         return param
 
-    def visitVarDecl(self, ast, param):
+    def visitVarDecl(self, ast, param) -> Symbol:
         res = self.lookup(ast.varName, param, lambda x: x.name)
-        if not res is None:
+
+        if res is not None:
             raise Redeclared(Variable(), ast.varName)
-        if ast.varInit:
-            initType = self.visit(ast.varInit, param)
-            if ast.varType is None:
-                ast.varType = initType
-            if not type(ast.varType) is type(initType):
-                raise TypeMismatch(ast)
+
+        if ast.varInit is None:
+            return Symbol(ast.varName, ast.varType, None)
+
+        init_type = self.visit(ast.varInit, param)
+        if ast.varType is None:
+            ast.varType = init_type
+
+        if type(ast.varType) is not type(init_type):
+            raise TypeMismatch(ast)
+
         return Symbol(ast.varName, ast.varType, None)
 
-    def visitFuncDecl(self, ast, param):
+    def visitFuncDecl(self, ast, param) -> Symbol:
         res = self.lookup(ast.name, param, lambda x: x.name)
-        if not res is None:
+
+        if res is not None:
             raise Redeclared(Function(), ast.name)
+
         return Symbol(ast.name, MType([], ast.retType))
 
-    def visitIntLiteral(self, ast, param):
+    @override
+    def visitIntLiteral(self, ast, param) -> IntType:
         return IntType()
 
-    def visitFloatLiteral(self, ast, param):
+    @override
+    def visitFloatLiteral(self, ast, param) -> FloatType:
         return FloatType()
 
-    def visitId(self, ast, param):
+    @override
+    def visitBooleanLiteral(self, ast, param) -> BoolType:
+        return BoolType()
+
+    @override
+    def visitStringLiteral(self, ast, param) -> StringType:
+        return StringType()
+
+    @override
+    def visitNilLiteral(self, ast, param) -> VoidType:
+        return VoidType()
+
+    @override
+    def visitArrayLiteral(self, ast, param) -> ArrayType:
+        expected_type = self.visit(ast.eleType, param)
+
+        def check_all_elements(node):
+            if isinstance(node, list):
+                for subnode in node:
+                    check_all_elements(subnode)
+            else:
+                actual_type = self.visit(node, param)
+                if type(expected_type) is not type(actual_type):
+                    raise TypeMismatch(ast)
+
+        check_all_elements(ast.value)
+
+        return ArrayType(ast.dimens, expected_type)
+
+    @override
+    def visitIntType(self, ast, param) -> IntType:
+        return IntType()
+
+    @override
+    def visitFloatType(self, ast, param) -> FloatType:
+        return FloatType()
+
+    @override
+    def visitBoolType(self, ast, param) -> BoolType:
+        return BoolType()
+
+    @override
+    def visitStringType(self, ast, param) -> StringType:
+        return StringType()
+
+    @override
+    def visitVoidType(self, ast, param) -> VoidType:
+        return VoidType()
+
+    @override
+    def visitArrayType(self, ast, param) -> ArrayType:
+        elemnet_type: Final = self.visit(ast.eleType, param)
+        return ArrayType(ast.dimens, elemnet_type)
+
+    @override
+    def visitStructType(self, ast, param) -> StructType:
+        new_elements: Final = [
+            (name, self.visit(typ, param)) for name, typ in ast.elements
+        ]
+
+        for method in ast.methods:
+            self.visit(method, param)
+
+        return StructType(ast.name, new_elements, ast.methods)
+
+    def visitId(self, ast, param) -> Id:
         res = self.lookup(ast.name, param, lambda x: x.name)
+
         if res is None:
             raise Undeclared(Identifier(), ast.name)
+
         return res.mtype
