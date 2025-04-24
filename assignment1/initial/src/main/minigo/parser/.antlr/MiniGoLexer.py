@@ -1,4 +1,4 @@
-# Generated from c:/Users/VanDai/Documents/Githup/MiniGo-complier/assignment1/initial/src/main/minigo/parser/MiniGo.g4 by ANTLR 4.13.1
+# Generated from c:/Users/Snow/source/repos/MiniGo-complier/assignment1/initial/src/main/minigo/parser/MiniGo.g4 by ANTLR 4.13.1
 from antlr4 import *
 from io import StringIO
 import sys
