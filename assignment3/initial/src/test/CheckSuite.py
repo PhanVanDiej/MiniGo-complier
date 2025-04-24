@@ -102,7 +102,12 @@ class CheckSuite(TestCase):
                     "main",
                     [],
                     VoidType(),
-                    Block([Assign(Id("a"), IntLiteral(10))]),
+                    Block(
+                        [
+                            Assign(Id("a"), IntLiteral(10)),
+                            Assign(Id("a"), IntLiteral(20)),
+                        ]
+                    ),
                 ),
             ]
         )

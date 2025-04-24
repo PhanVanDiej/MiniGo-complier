@@ -227,7 +227,7 @@ class StaticChecker(BaseVisitor, Utils):
     def visitAssign(self, ast, param):
         if isinstance(ast.lhs, Id):
             sym = self.lookup(ast.lhs.name, param, lambda x: x.name)
-            if sym is not None and isinstance(sym.value, Expr):
+            if self._isConst(sym):
                 raise CannotAssignToConstant(ast.lhs.name)
 
         lhs_type = self.visit(ast.lhs, param)
@@ -237,23 +237,32 @@ class StaticChecker(BaseVisitor, Utils):
             raise TypeMismatch(ast)
 
         if isinstance(lhs_type, ArrayType):
-            if not isinstance(rhs_type, ArrayType):
-                raise TypeMismatch(ast)
-
-            if len(lhs_type.dimens) != len(rhs_type.dimens):
-                raise TypeMismatch(ast)
-
-            lhs_elem_type = lhs_type.eleType
-            rhs_elem_type = rhs_type.eleType
-            if type(lhs_elem_type) is not type(rhs_elem_type) and not (
-                isinstance(lhs_elem_type, FloatType)
-                and isinstance(rhs_elem_type, IntType)
-            ):
-                raise TypeMismatch(ast)
-
-        elif type(lhs_type) is not type(rhs_type) and not (
-            isinstance(lhs_type, FloatType) and isinstance(rhs_type, IntType)
-        ):
-            raise TypeMismatch(ast)
+            self._checkArrayAssignment(lhs_type, rhs_type, ast)
+        else:
+            self._checkScalarAssignment(lhs_type, rhs_type, ast)
 
         return lhs_type
+
+    def _isConst(self, sym):
+        return sym is not None and isinstance(sym.value, Expr)
+
+    def _checkArrayAssignment(self, lhs_type, rhs_type, ast):
+        if not isinstance(rhs_type, ArrayType):
+            raise TypeMismatch(ast)
+
+        if len(lhs_type.dimens) != len(rhs_type.dimens):
+            raise TypeMismatch(ast)
+
+        lhs_elem = lhs_type.eleType
+        rhs_elem = rhs_type.eleType
+        if not self._isTypeCompatible(lhs_elem, rhs_elem):
+            raise TypeMismatch(ast)
+
+    def _checkScalarAssignment(self, lhs_type, rhs_type, ast):
+        if not self._isTypeCompatible(lhs_type, rhs_type):
+            raise TypeMismatch(ast)
+
+    def _isTypeCompatible(self, lhs_type, rhs_type):
+        return type(lhs_type) is type(rhs_type) or (
+            isinstance(lhs_type, FloatType) and isinstance(rhs_type, IntType)
+        )
