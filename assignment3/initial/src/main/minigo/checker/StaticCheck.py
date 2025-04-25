@@ -30,6 +30,7 @@ from StaticError import (
     TypeMismatch,
     Undeclared,
     Variable,
+    Type as StaticErrorType,
 )
 from Utils import Utils
 from functools import reduce
@@ -607,12 +608,11 @@ class StaticChecker(BaseVisitor, Utils):
             ast.fun.name, MType([p.parType for p in ast.fun.params], ast.fun.retType)
         )
 
-        local_scope = [method_sym]
+        local_scope = [Symbol("self", ast.recType), method_sym]
         for p in ast.fun.params:
             if self.lookup(p.parName, local_scope, lambda x: x.name):
                 raise Redeclared(Parameter(), p.parName)
             local_scope.insert(0, Symbol(p.parName, p.parType))
 
         self.visit(ast.fun.body, local_scope + param)
-
         return method_sym

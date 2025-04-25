@@ -907,3 +907,150 @@ class CheckSuite(TestCase):
         )
         expect = "Redeclared Prototype: reset\n"
         self.assertTrue(TestChecker.test(input_ast, expect, 443))
+
+    def test_struct_literal_success(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType("P", [("x", IntType()), ("y", BoolType())], []),
+                    StructLiteral(
+                        "P", [("x", IntLiteral(1)), ("y", BooleanLiteral(True))]
+                    ),
+                )
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 444))
+
+    def test_full_semantic_features(self):
+        input_ast = Program(
+            [
+                ConstDecl("pi", FloatType(), FloatLiteral(3.14)),
+                VarDecl("count", IntType(), IntLiteral(0)),
+                VarDecl(
+                    "matrix",
+                    ArrayType([IntLiteral(2), IntLiteral(2)], IntType()),
+                    ArrayLiteral(
+                        [IntLiteral(2), IntLiteral(2)],
+                        IntType(),
+                        [
+                            [IntLiteral(1), IntLiteral(2)],
+                            [IntLiteral(3), IntLiteral(4)],
+                        ],
+                    ),
+                ),
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Point",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType(
+                                    "Point",
+                                    [("x", FloatType()), ("y", FloatType())],
+                                    [],
+                                ),
+                                FuncDecl(
+                                    "move",
+                                    [
+                                        ParamDecl("dx", FloatType()),
+                                        ParamDecl("dy", FloatType()),
+                                    ],
+                                    VoidType(),
+                                    Block(
+                                        [
+                                            Assign(
+                                                FieldAccess(Id("self"), "x"),
+                                                BinaryOp(
+                                                    "+",
+                                                    FieldAccess(Id("self"), "x"),
+                                                    Id("dx"),
+                                                ),
+                                            ),
+                                            Assign(
+                                                FieldAccess(Id("self"), "y"),
+                                                BinaryOp(
+                                                    "+",
+                                                    FieldAccess(Id("self"), "y"),
+                                                    Id("dy"),
+                                                ),
+                                            ),
+                                            Return(None),
+                                        ]
+                                    ),
+                                ),
+                            )
+                        ],
+                    ),
+                    StructLiteral(
+                        "Point", [("x", FloatLiteral(0.0)), ("y", FloatLiteral(0.0))]
+                    ),
+                ),
+                VarDecl(
+                    "s",
+                    InterfaceType(
+                        "Shifter",
+                        [Prototype("move", [FloatType(), FloatType()], VoidType())],
+                    ),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            Assign(Id("s"), Id("p")),
+                            If(
+                                BinaryOp(">", Id("count"), IntLiteral(0)),
+                                Block(
+                                    [
+                                        FuncCall(
+                                            "putStringLn", [StringLiteral("Running")]
+                                        )
+                                    ]
+                                ),
+                                Block(
+                                    [
+                                        FuncCall(
+                                            "putStringLn", [StringLiteral("Starting")]
+                                        )
+                                    ]
+                                ),
+                            ),
+                            ForBasic(
+                                BinaryOp("<", Id("count"), IntLiteral(2)),
+                                Block(
+                                    [
+                                        MethCall(
+                                            Id("s"),
+                                            "move",
+                                            [FloatLiteral(1.0), FloatLiteral(2.0)],
+                                        ),
+                                        Assign(
+                                            Id("count"),
+                                            BinaryOp("+", Id("count"), IntLiteral(1)),
+                                        ),
+                                        Continue(),
+                                    ]
+                                ),
+                            ),
+                            ForEach(
+                                Id("i"),
+                                Id("val"),
+                                Id("matrix"),
+                                Block([FuncCall("putIntLn", [Id("val")])]),
+                            ),
+                            Return(None),
+                        ]
+                    ),
+                ),
+            ]
+        )
+
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 499))
+        print("Done")
