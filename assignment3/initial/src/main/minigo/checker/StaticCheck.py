@@ -20,6 +20,7 @@ from AST import (
 from StaticError import (
     CannotAssignToConstant,
     Constant,
+    Field,
     Function,
     Identifier,
     Method,
@@ -490,3 +491,37 @@ class StaticChecker(BaseVisitor, Utils):
                     return proto
 
         raise Undeclared(Method(), method_name)
+
+    @override
+    def visitArrayCell(self, ast, param):
+        arr_type = self.visit(ast.arr, param)
+
+        if not isinstance(arr_type, ArrayType):
+            raise TypeMismatch(ast)
+
+        if len(ast.idx) > len(arr_type.dimens):
+            raise TypeMismatch(ast)
+
+        for idx_expr in ast.idx:
+            idx_type = self.visit(idx_expr, param)
+            if not isinstance(idx_type, IntType):
+                raise TypeMismatch(ast)
+
+        remaining_dims = arr_type.dimens[len(ast.idx) :]
+        if remaining_dims:
+            return ArrayType(remaining_dims, arr_type.eleType)
+        else:
+            return arr_type.eleType
+
+    @override
+    def visitFieldAccess(self, ast, param):
+        recv_type = self.visit(ast.receiver, param)
+
+        if not isinstance(recv_type, StructType):
+            raise TypeMismatch(ast)
+
+        for name, field_type in recv_type.elements:
+            if name == ast.field:
+                return field_type
+
+        raise Undeclared(Field(), ast.field)

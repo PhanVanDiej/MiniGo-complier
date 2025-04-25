@@ -2,6 +2,7 @@ from typing import cast, final
 from unittest import TestCase
 from TestUtils import TestChecker
 from AST import (
+    ArrayCell,
     ArrayLiteral,
     ArrayType,
     Assign,
@@ -14,6 +15,7 @@ from AST import (
     ConstDecl,
     Continue,
     Decl,
+    FieldAccess,
     FloatLiteral,
     FloatType,
     ForBasic,
@@ -498,3 +500,205 @@ class CheckSuite(TestCase):
         )
         expect = ""
         self.assertTrue(TestChecker.test(input_ast, expect, 428))
+
+    def test_arraycell_valid_access(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "a",
+                    ArrayType([IntLiteral(2), IntLiteral(3)], IntType()),
+                    ArrayLiteral(
+                        [IntLiteral(2), IntLiteral(3)],
+                        IntType(),
+                        [
+                            [IntLiteral(1), IntLiteral(2), IntLiteral(3)],
+                            [IntLiteral(4), IntLiteral(5), IntLiteral(6)],
+                        ],
+                    ),
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            VarDecl(
+                                "x",
+                                IntType(),
+                                ArrayCell(Id("a"), [IntLiteral(1), IntLiteral(2)]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 429))
+
+    def test_arraycell_too_many_indices(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "a",
+                    ArrayType([IntLiteral(2)], IntType()),
+                    ArrayLiteral(
+                        [IntLiteral(2)], IntType(), [IntLiteral(1), IntLiteral(2)]
+                    ),
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            VarDecl(
+                                "x",
+                                IntType(),
+                                ArrayCell(Id("a"), [IntLiteral(0), IntLiteral(1)]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: ArrayCell(Id(a),[IntLiteral(0),IntLiteral(1)])\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 430))
+
+    def test_arraycell_index_not_int(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "a",
+                    ArrayType([IntLiteral(2)], IntType()),
+                    ArrayLiteral(
+                        [IntLiteral(2)], IntType(), [IntLiteral(1), IntLiteral(2)]
+                    ),
+                ),
+                VarDecl("s", StringType(), StringLiteral("abc")),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([VarDecl("x", IntType(), ArrayCell(Id("a"), [Id("s")]))]),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: ArrayCell(Id(a),[Id(s)])\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 431))
+
+    def test_field_access_success(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Person", [("name", StringType()), ("age", IntType())], []
+                    ),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([VarDecl("n", StringType(), FieldAccess(Id("p"), "name"))]),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 432))
+
+    def test_field_access_invalid_field(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Person", [("name", StringType()), ("age", IntType())], []
+                    ),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [VarDecl("addr", StringType(), FieldAccess(Id("p"), "address"))]
+                    ),
+                ),
+            ]
+        )
+        expect = "Undeclared Field: address\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 433))
+
+    def test_field_access_assign_success(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Person", [("name", StringType()), ("age", IntType())], []
+                    ),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(FieldAccess(Id("p"), "age"), IntLiteral(30))]),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 434))
+
+    def test_field_access_func_call(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Person", [("name", StringType()), ("age", IntType())], []
+                    ),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([FuncCall("putIntLn", [FieldAccess(Id("p"), "age")])]),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 435))
+
+    def test_field_access_binary_op(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType("Point", [("x", FloatType()), ("y", FloatType())], []),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            VarDecl(
+                                "dist",
+                                FloatType(),
+                                BinaryOp(
+                                    "+",
+                                    FieldAccess(Id("p"), "x"),
+                                    FieldAccess(Id("p"), "y"),
+                                ),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 436))
