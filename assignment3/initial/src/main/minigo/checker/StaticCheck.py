@@ -300,6 +300,66 @@ class StaticChecker(BaseVisitor, Utils):
         return func_type.rettype
 
     @override
+    def visitIf(self, ast, param):
+        cond_type = self.visit(ast.expr, param)
+        if not isinstance(cond_type, BoolType):
+            raise TypeMismatch(ast)
+
+        self.visit(ast.thenStmt, param)
+        if ast.elseStmt is not None:
+            self.visit(ast.elseStmt, param)
+
+        return None
+
+    @override
+    def visitForBasic(self, ast, param):
+        cond_type = self.visit(ast.cond, param)
+        if not isinstance(cond_type, BoolType):
+            raise TypeMismatch(ast)
+
+        self.visit(ast.loop, param)
+        return None
+
+    @override
+    def visitForStep(self, ast, param) -> None:
+        local_env = param.copy()
+
+        init_result = self.visit(ast.init, local_env)
+        if isinstance(ast.init, (VarDecl, ConstDecl)):
+            local_env.insert(0, init_result)
+
+        cond_type = self.visit(ast.cond, local_env)
+        if not isinstance(cond_type, BoolType):
+            raise TypeMismatch(ast)
+
+        self.visit(ast.upda, local_env)
+        self.visit(ast.loop, local_env)
+
+        return None
+
+    @override
+    def visitForEach(self, ast, param) -> None:
+        arr_type = self.visit(ast.arr, param)
+        if not isinstance(arr_type, ArrayType):
+            raise TypeMismatch(ast)
+
+        local_env = param.copy()
+
+        local_env.insert(0, Symbol(ast.idx.name, IntType()))
+        local_env.insert(0, Symbol(ast.value.name, arr_type.eleType))
+
+        self.visit(ast.loop, local_env)
+        return None
+
+    @override
+    def visitBreak(self, ast, param) -> None:
+        return None
+
+    @override
+    def visitContinue(self, ast, param) -> None:
+        return None
+
+    @override
     def visitReturn(self, ast, param):
         func_type = None
         for sym in param:
@@ -372,3 +432,22 @@ class StaticChecker(BaseVisitor, Utils):
 
     def _isNumeric(self, typ):
         return isinstance(typ, (IntType, FloatType))
+
+    @override
+    def visitUnaryOp(self, ast, param):
+        operand_type = self.visit(ast.body, param)
+        op = ast.op
+
+        if op == "!":
+            if isinstance(operand_type, BoolType):
+                return BoolType()
+            raise TypeMismatch(ast)
+
+        if op == "-":
+            if isinstance(operand_type, IntType):
+                return IntType()
+            if isinstance(operand_type, FloatType):
+                return FloatType()
+            raise TypeMismatch(ast)
+
+        raise TypeMismatch(ast)

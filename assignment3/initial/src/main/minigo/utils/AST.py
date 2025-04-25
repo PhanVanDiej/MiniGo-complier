@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, ABCMeta
 from dataclasses import dataclass
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 from Visitor import Visitor
 
 
@@ -281,7 +281,7 @@ class InterfaceType(Type):
 
 @dataclass
 class Block(Stmt):
-    member: List[BlockMember]
+    member: list[BlockMember]
 
     def __str__(self):
         return "Block([" + ",".join(str(i) for i in self.member) + "])"
@@ -306,7 +306,7 @@ class Assign(Stmt):
 class If(Stmt):
     expr: Expr
     thenStmt: Stmt
-    elseStmt: Stmt  # None if there is no else
+    elseStmt: Optional[Stmt]  # None if there is no else
 
     def __str__(self):
         return (

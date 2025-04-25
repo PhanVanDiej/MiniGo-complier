@@ -1,4 +1,4 @@
-from typing import final
+from typing import cast, final
 from unittest import TestCase
 from TestUtils import TestChecker
 from AST import (
@@ -7,12 +7,21 @@ from AST import (
     Assign,
     BinaryOp,
     Block,
+    BlockMember,
+    BoolType,
+    BooleanLiteral,
+    Break,
     ConstDecl,
+    Continue,
     FloatLiteral,
     FloatType,
+    ForBasic,
+    ForEach,
+    ForStep,
     FuncCall,
     FuncDecl,
     Id,
+    If,
     IntLiteral,
     IntType,
     ParamDecl,
@@ -20,6 +29,7 @@ from AST import (
     Return,
     StringLiteral,
     StringType,
+    UnaryOp,
     VarDecl,
     VoidType,
 )
@@ -221,3 +231,240 @@ class CheckSuite(TestCase):
         )
         expect = ""
         self.assertTrue(TestChecker.test(input_ast, expect, 416))
+
+    def test_if_with_boolean_condition(self):
+        input_ast = Program(
+            [
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [If(BooleanLiteral(True), Block([]), None)],
+                    ),
+                )
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 417))
+
+    def test_if_with_non_boolean_condition(self):
+        input_ast = Program(
+            [
+                FuncDecl(
+                    "main", [], VoidType(), Block([If(IntLiteral(1), Block([]), None)])
+                )
+            ]
+        )
+        expect = "Type Mismatch: If(IntLiteral(1),Block([]))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 418))
+
+    def test_for_basic_with_int_condition(self):
+        input_ast = Program(
+            [
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([ForBasic(IntLiteral(1), Block([]))]),
+                )
+            ]
+        )
+        expect = "Type Mismatch: For(IntLiteral(1),Block([]))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 419))
+
+    def test_for_basic_success(self):
+        input_ast = Program(
+            [
+                VarDecl("i", IntType(), IntLiteral(0)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            ForBasic(
+                                BinaryOp("<", Id("i"), IntLiteral(10)),
+                                Block(
+                                    [
+                                        Assign(
+                                            Id("i"),
+                                            BinaryOp("+", Id("i"), IntLiteral(1)),
+                                        )
+                                    ]
+                                ),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 420))
+
+    def test_for_step_success(self):
+        input_ast = Program(
+            [
+                VarDecl("i", IntType(), IntLiteral(0)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            ForStep(
+                                Assign(Id("i"), IntLiteral(0)),
+                                BinaryOp("<", Id("i"), IntLiteral(5)),
+                                Assign(Id("i"), BinaryOp("+", Id("i"), IntLiteral(1))),
+                                Block([FuncCall("putIntLn", [Id("i")])]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 421))
+
+    def test_for_step_type_mismatch_in_condition(self):
+        input_ast = Program(
+            [
+                VarDecl("i", IntType(), IntLiteral(0)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            ForStep(
+                                Assign(Id("i"), IntLiteral(0)),
+                                IntLiteral(123),
+                                Assign(Id("i"), BinaryOp("+", Id("i"), IntLiteral(1))),
+                                Block([]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: For(Assign(Id(i),IntLiteral(0)),IntLiteral(123),Assign(Id(i),BinaryOp(Id(i),+,IntLiteral(1))),Block([]))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 422))
+
+    def test_foreach_success(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "arr",
+                    ArrayType([IntLiteral(3)], IntType()),
+                    ArrayLiteral(
+                        [IntLiteral(3)],
+                        IntType(),
+                        [IntLiteral(1), IntLiteral(2), IntLiteral(3)],
+                    ),
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            ForEach(
+                                Id("i"),
+                                Id("val"),
+                                Id("arr"),
+                                Block([FuncCall("putIntLn", [Id("val")])]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 423))
+
+    def test_foreach_type_mismatch_non_array(self):
+        input_ast = Program(
+            [
+                VarDecl("notArr", IntType(), IntLiteral(10)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            ForEach(
+                                Id("i"),
+                                Id("v"),
+                                Id("notArr"),
+                                Block([FuncCall("putIntLn", [Id("v")])]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: ForEach(Id(i),Id(v),Id(notArr),Block([FuncCall(putIntLn,[Id(v)])]))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 424))
+
+    def test_break_continue_in_loop(self):
+        input_ast = Program(
+            [
+                VarDecl("i", IntType(), IntLiteral(0)),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            ForBasic(
+                                BinaryOp("<", Id("i"), IntLiteral(10)),
+                                Block([Continue(), Break()]),
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 425))
+
+    def test_unary_op_success(self):
+        input_ast = Program(
+            [
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            VarDecl("a", IntType(), IntLiteral(5)),
+                            VarDecl("b", FloatType(), UnaryOp("-", FloatLiteral(3.14))),
+                            VarDecl(
+                                "c", BoolType(), UnaryOp("!", BooleanLiteral(True))
+                            ),
+                        ]
+                    ),
+                )
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 426))
+
+    def test_unary_op_type_mismatch(self):
+        input_ast = Program(
+            [
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            VarDecl("s", StringType(), StringLiteral("abc")),
+                            VarDecl("x", IntType(), UnaryOp("-", Id("s"))),
+                        ]
+                    ),
+                )
+            ]
+        )
+        expect = "Type Mismatch: UnaryOp(-,Id(s))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 427))
