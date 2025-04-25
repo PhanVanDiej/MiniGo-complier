@@ -440,57 +440,53 @@ class StaticChecker(BaseVisitor, Utils):
         sym = self.lookup(ast.funName, param, lambda x: x.name)
         if sym is None:
             raise Undeclared(Function(), ast.funName)
-
         if not isinstance(sym.mtype, MType):
             raise TypeMismatch(ast)
 
-        func_type: MType = sym.mtype
-        if len(ast.args) != len(func_type.partype):
+        return self._checkFunctionCall(
+            ast.funName, ast.args, param, sym.mtype.partype, sym.mtype.rettype, ast
+        )
+
+    def _checkFunctionCall(
+        self, name: str, args: list, param, partypes, rettype, ast
+    ) -> Type:
+        if len(args) != len(partypes):
             raise TypeMismatch(ast)
 
-        for arg, expected_type in zip(ast.args, func_type.partype):
+        for arg, expected_type in zip(args, partypes):
             arg_type = self.visit(arg, param)
             if not self._isTypeCompatible(expected_type, arg_type):
                 raise TypeMismatch(ast)
 
-        return func_type.rettype
+        return rettype
 
     @override
     def visitMethCall(self, ast, param):
         recv_type = self.visit(ast.receiver, param)
-
         if not isinstance(recv_type, (StructType, InterfaceType)):
             raise TypeMismatch(ast)
 
-        method_decl = None
-
-        if isinstance(recv_type, StructType):
-            for m in recv_type.methods:
-                if m.fun.name == ast.metName:
-                    method_decl = m.fun
-                    break
-        else:
-            for proto in recv_type.methods:
-                if proto.name == ast.metName:
-                    method_decl = proto
-                    break
-
-        if method_decl is None:
-            raise Undeclared(Method(), ast.metName)
+        method_decl = self._getMethodFromReceiver(recv_type, ast.metName, ast)
 
         if isinstance(method_decl, FuncDecl):
-            param_types = [p.parType for p in method_decl.params]
-            return_type = method_decl.retType
+            partypes = [p.parType for p in method_decl.params]
+            rettype = method_decl.retType
         else:
-            param_types = method_decl.params
-            return_type = method_decl.retType
+            partypes = method_decl.params
+            rettype = method_decl.retType
 
-        if len(ast.args) != len(param_types):
-            raise TypeMismatch(ast)
+        return self._checkFunctionCall(
+            ast.metName, ast.args, param, partypes, rettype, ast
+        )
 
-        for arg, expected_type in zip(ast.args, param_types):
-            arg_type = self.visit(arg, param)
-            if not self._isTypeCompatible(expected_type, arg_type):
-                raise TypeMismatch(ast)
+    def _getMethodFromReceiver(self, recv_type, method_name, ast):
+        if isinstance(recv_type, StructType):
+            for m in recv_type.methods:
+                if m.fun.name == method_name:
+                    return m.fun
+        elif isinstance(recv_type, InterfaceType):
+            for proto in recv_type.methods:
+                if proto.name == method_name:
+                    return proto
 
-        return return_type
+        raise Undeclared(Method(), method_name)
