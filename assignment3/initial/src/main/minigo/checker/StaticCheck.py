@@ -4,6 +4,7 @@ from AST import (
     AST,
     ArrayType,
     BoolType,
+    ConstDecl,
     Expr,
     FloatType,
     Id,
@@ -11,6 +12,7 @@ from AST import (
     StringType,
     StructType,
     Type,
+    VarDecl,
     VoidType,
 )
 from StaticError import (
@@ -18,6 +20,7 @@ from StaticError import (
     Constant,
     Function,
     Identifier,
+    Parameter,
     Redeclared,
     TypeMismatch,
     Undeclared,
@@ -116,15 +119,24 @@ class StaticChecker(BaseVisitor, Utils):
         if res is not None:
             raise Redeclared(Function(), ast.name)
 
-        local_scope = []
-        self.visit(ast.body, local_scope + param)
+        func_sym = Symbol(ast.name, MType([p.parType for p in ast.params], ast.retType))
 
-        return Symbol(ast.name, MType([], ast.retType))
+        local_scope = [func_sym]
+        for par in ast.params:
+            if self.lookup(par.parName, local_scope, lambda x: x.name):
+                raise Redeclared(Parameter(), par.parName)
+            local_scope.append(Symbol(par.parName, par.parType))
+
+        self.visit(ast.body, local_scope + param)
+        return func_sym
 
     @override
     def visitBlock(self, ast, param):
+        local = param.copy()
         for stmt in ast.member:
-            self.visit(stmt, param)
+            sym = self.visit(stmt, local)
+            if isinstance(stmt, (VarDecl, ConstDecl)):
+                local.insert(0, sym)
 
     @override
     def visitIntLiteral(self, ast, param) -> IntType:
@@ -266,3 +278,97 @@ class StaticChecker(BaseVisitor, Utils):
         return type(lhs_type) is type(rhs_type) or (
             isinstance(lhs_type, FloatType) and isinstance(rhs_type, IntType)
         )
+
+    @override
+    def visitFuncCall(self, ast, param) -> Type:
+        sym = self.lookup(ast.funName, param, lambda x: x.name)
+        if sym is None:
+            raise Undeclared(Function(), ast.funName)
+
+        if not isinstance(sym.mtype, MType):
+            raise TypeMismatch(ast)
+
+        func_type: MType = sym.mtype
+        if len(ast.args) != len(func_type.partype):
+            raise TypeMismatch(ast)
+
+        for arg, expected_type in zip(ast.args, func_type.partype):
+            arg_type = self.visit(arg, param)
+            if not self._isTypeCompatible(expected_type, arg_type):
+                raise TypeMismatch(ast)
+
+        return func_type.rettype
+
+    @override
+    def visitReturn(self, ast, param):
+        func_type = None
+        for sym in param:
+            if isinstance(sym.mtype, MType):
+                func_type = sym.mtype.rettype
+                break
+
+        if func_type is None:
+            raise TypeMismatch(ast)
+
+        if isinstance(func_type, VoidType):
+            if ast.expr is not None:
+                raise TypeMismatch(ast)
+        else:
+            if ast.expr is None:
+                raise TypeMismatch(ast)
+            expr_type = self.visit(ast.expr, param)
+            if not self._isTypeCompatible(func_type, expr_type):
+                raise TypeMismatch(ast)
+
+        return None
+
+    @override
+    def visitBinaryOp(self, ast, param):
+        left_type = self.visit(ast.left, param)
+        right_type = self.visit(ast.right, param)
+        op = ast.op
+
+        if op in ["+", "-", "*", "/"]:
+            return self._handleArithmeticOp(op, left_type, right_type, ast)
+
+        if op == "%":
+            return self._handleModuloOp(left_type, right_type, ast)
+
+        if op in ["==", "!=", "<", "<=", ">", ">="]:
+            return self._handleComparisonOp(op, left_type, right_type, ast)
+
+        if op in ["&&", "||"]:
+            return self._handleBooleanOp(left_type, right_type, ast)
+
+        raise TypeMismatch(ast)
+
+    def _handleArithmeticOp(self, op, left, right, ast):
+        if isinstance(left, StringType) and isinstance(right, StringType) and op == "+":
+            return StringType()
+        if self._isNumeric(left) and self._isNumeric(right):
+            return (
+                FloatType()
+                if isinstance(left, FloatType) or isinstance(right, FloatType)
+                else IntType()
+            )
+        raise TypeMismatch(ast)
+
+    def _handleModuloOp(self, left, right, ast):
+        if isinstance(left, IntType) and isinstance(right, IntType):
+            return IntType()
+        raise TypeMismatch(ast)
+
+    def _handleComparisonOp(self, op, left, right, ast):
+        if type(left) is not type(right):
+            raise TypeMismatch(ast)
+        if isinstance(left, (IntType, FloatType, StringType)):
+            return BoolType()
+        raise TypeMismatch(ast)
+
+    def _handleBooleanOp(self, left, right, ast):
+        if isinstance(left, BoolType) and isinstance(right, BoolType):
+            return BoolType()
+        raise TypeMismatch(ast)
+
+    def _isNumeric(self, typ):
+        return isinstance(typ, (IntType, FloatType))
