@@ -944,7 +944,7 @@ class CheckSuite(TestCase):
                     "p",
                     StructType(
                         "Point",
-                        [],
+                        [("x", FloatType()), ("y", FloatType())],
                         [
                             MethodDecl(
                                 "self",
@@ -1053,4 +1053,136 @@ class CheckSuite(TestCase):
 
         expect = ""
         self.assertTrue(TestChecker.test(input_ast, expect, 499))
-        print("Done")
+
+    def test_full_semantic_valid_program(self):
+        input_ast = Program(
+            [
+                # Interface
+                VarDecl(
+                    "Movable",
+                    InterfaceType(
+                        "Movable",
+                        [Prototype("move", [FloatType(), FloatType()], VoidType())],
+                    ),
+                    None,
+                ),
+                # Struct Point với method move
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Point",
+                        [("x", FloatType()), ("y", FloatType())],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType(
+                                    "Point",
+                                    [("x", FloatType()), ("y", FloatType())],
+                                    [],
+                                ),
+                                FuncDecl(
+                                    "move",
+                                    [
+                                        ParamDecl("dx", FloatType()),
+                                        ParamDecl("dy", FloatType()),
+                                    ],
+                                    VoidType(),
+                                    Block(
+                                        [
+                                            Assign(
+                                                FieldAccess(Id("self"), "x"),
+                                                BinaryOp(
+                                                    "+",
+                                                    FieldAccess(Id("self"), "x"),
+                                                    Id("dx"),
+                                                ),
+                                            ),
+                                            Assign(
+                                                FieldAccess(Id("self"), "y"),
+                                                BinaryOp(
+                                                    "+",
+                                                    FieldAccess(Id("self"), "y"),
+                                                    Id("dy"),
+                                                ),
+                                            ),
+                                            Return(None),
+                                        ]
+                                    ),
+                                ),
+                            )
+                        ],
+                    ),
+                    StructLiteral(
+                        "Point",
+                        [("x", FloatLiteral(0.0)), ("y", FloatLiteral(0.0))],
+                    ),
+                ),
+                # Main function
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block(
+                        [
+                            VarDecl(
+                                "m",
+                                InterfaceType(
+                                    "Movable",
+                                    [
+                                        Prototype(
+                                            "move",
+                                            [FloatType(), FloatType()],
+                                            VoidType(),
+                                        )
+                                    ],
+                                ),
+                                None,
+                            ),
+                            Assign(Id("m"), Id("p")),
+                            # Create an array
+                            VarDecl(
+                                "arr",
+                                ArrayType([IntLiteral(3)], IntType()),
+                                ArrayLiteral(
+                                    [IntLiteral(3)],
+                                    IntType(),
+                                    [IntLiteral(1), IntLiteral(2), IntLiteral(3)],
+                                ),
+                            ),
+                            # ForEach over arr
+                            ForEach(
+                                Id("i"),
+                                Id("val"),
+                                Id("arr"),
+                                Block(
+                                    [
+                                        If(
+                                            BinaryOp(">", Id("val"), IntLiteral(2)),
+                                            Block([Break()]),
+                                            Block(
+                                                [
+                                                    FuncCall("putIntLn", [Id("val")]),
+                                                    Continue(),
+                                                ]
+                                            ),
+                                        )
+                                    ]
+                                ),
+                            ),
+                            # Call method move
+                            MethCall(
+                                Id("m"),
+                                "move",
+                                [FloatLiteral(1.5), FloatLiteral(2.5)],
+                            ),
+                            # Print final x, y
+                            FuncCall("putFloatLn", [FieldAccess(Id("p"), "x")]),
+                            FuncCall("putFloatLn", [FieldAccess(Id("p"), "y")]),
+                            Return(None),
+                        ]
+                    ),
+                ),
+            ],
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 500))
