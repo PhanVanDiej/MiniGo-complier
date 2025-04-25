@@ -25,6 +25,7 @@ from StaticError import (
     Identifier,
     Method,
     Parameter,
+    Prototype,
     Redeclared,
     TypeMismatch,
     Undeclared,
@@ -93,10 +94,12 @@ class StaticChecker(BaseVisitor, Utils):
     def check(self):
         return self.visit(self.ast, self.global_envi)
 
+    @override
     def visitProgram(self, ast, param):
         reduce(lambda acc, ele: [self.visit(ele, acc)] + acc, ast.decl, param)
         return param
 
+    @override
     def visitVarDecl(self, ast, param) -> Symbol:
         res = self.lookup(ast.varName, param, lambda x: x.name)
 
@@ -117,6 +120,7 @@ class StaticChecker(BaseVisitor, Utils):
 
         return Symbol(ast.varName, ast.varType, None)
 
+    @override
     def visitFuncDecl(self, ast, param) -> Symbol:
         res = self.lookup(ast.name, param, lambda x: x.name)
 
@@ -206,11 +210,13 @@ class StaticChecker(BaseVisitor, Utils):
 
     @override
     def visitStructType(self, ast, param) -> StructType:
-        new_elements: Final = [
-            (name, self.visit(typ, param)) for name, typ in ast.elements
-        ]
+        new_elements = [(name, self.visit(typ, param)) for name, typ in ast.elements]
 
+        method_names = []
         for method in ast.methods:
+            if method.fun.name in method_names:
+                raise Redeclared(Method(), method.fun.name)
+            method_names.append(method.fun.name)
             self.visit(method, param)
 
         return StructType(ast.name, new_elements, ast.methods)
@@ -274,14 +280,43 @@ class StaticChecker(BaseVisitor, Utils):
         if not self._isTypeCompatible(lhs_elem, rhs_elem):
             raise TypeMismatch(ast)
 
-    def _checkScalarAssignment(self, lhs_type, rhs_type, ast):
-        if not self._isTypeCompatible(lhs_type, rhs_type):
-            raise TypeMismatch(ast)
-
     def _isTypeCompatible(self, lhs_type, rhs_type):
         return type(lhs_type) is type(rhs_type) or (
             isinstance(lhs_type, FloatType) and isinstance(rhs_type, IntType)
         )
+
+    def _checkScalarAssignment(self, lhs_type, rhs_type, ast):
+        if self._isTypeCompatible(lhs_type, rhs_type):
+            return
+
+        if isinstance(lhs_type, InterfaceType) and isinstance(rhs_type, StructType):
+            if not self._doesStructImplementInterface(rhs_type, lhs_type):
+                raise TypeMismatch(ast)
+            return
+
+        raise TypeMismatch(ast)
+
+    def _doesStructImplementInterface(
+        self, struct_type: StructType, interface_type: InterfaceType
+    ) -> bool:
+        method_dict = {m.fun.name: m.fun for m in struct_type.methods}
+
+        for proto in interface_type.methods:
+            if proto.name not in method_dict:
+                return False
+
+            method = method_dict[proto.name]
+            if len(proto.params) != len(method.params):
+                return False
+
+            for p_type, m_param in zip(proto.params, method.params):
+                if type(p_type) is not type(m_param.parType):
+                    return False
+
+            if type(proto.retType) is not type(method.retType):
+                return False
+
+        return True
 
     @override
     def visitIf(self, ast, param):
@@ -525,3 +560,28 @@ class StaticChecker(BaseVisitor, Utils):
                 return field_type
 
         raise Undeclared(Field(), ast.field)
+
+    @override
+    def visitPrototype(self, ast, param):
+        if self.lookup(ast.name, param, lambda x: x.name):
+            raise Redeclared(Prototype(), ast.name)
+
+        param_types = [self.visit(p, param) for p in ast.params]
+        return_type = self.visit(ast.retType, param)
+
+        return Symbol(ast.name, MType(param_types, return_type))
+
+    @override
+    def visitInterfaceType(self, ast, param):
+        local_methods = []
+        method_names = []
+
+        for proto in ast.methods:
+            if proto.name in method_names:
+                raise Redeclared(Prototype(), proto.name)
+            method_names.append(proto.name)
+
+            proto_sym = self.visit(proto, local_methods)
+            local_methods.append(proto_sym)
+
+        return InterfaceType(ast.name, ast.methods)

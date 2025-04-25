@@ -27,10 +27,12 @@ from AST import (
     If,
     IntLiteral,
     IntType,
+    InterfaceType,
     MethCall,
     MethodDecl,
     ParamDecl,
     Program,
+    Prototype,
     Return,
     StringLiteral,
     StringType,
@@ -702,3 +704,128 @@ class CheckSuite(TestCase):
         )
         expect = ""
         self.assertTrue(TestChecker.test(input_ast, expect, 436))
+
+    def test_method_decl_correct_in_struct(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "p",
+                    StructType(
+                        "Point",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType("Point", [], []),
+                                FuncDecl(
+                                    "move",
+                                    [
+                                        ParamDecl("dx", IntType()),
+                                        ParamDecl("dy", IntType()),
+                                    ],
+                                    VoidType(),
+                                    Block([]),
+                                ),
+                            )
+                        ],
+                    ),
+                    None,
+                ),
+                FuncDecl("main", [], VoidType(), Block([])),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 437))
+
+    def test_struct_implements_interface_success(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "c",
+                    StructType(
+                        "Counter",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType("Counter", [], []),
+                                FuncDecl("reset", [], VoidType(), Block([])),
+                            )
+                        ],
+                    ),
+                    None,
+                ),
+                VarDecl(
+                    "i",
+                    InterfaceType("Resettable", [Prototype("reset", [], VoidType())]),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(Id("i"), Id("c"))]),
+                ),
+            ]
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 438))
+
+    def test_struct_missing_method_interface(self):
+        input_ast = Program(
+            [
+                VarDecl("c", StructType("Counter", [], []), None),
+                VarDecl(
+                    "i",
+                    InterfaceType("Resettable", [Prototype("reset", [], VoidType())]),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(Id("i"), Id("c"))]),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: Assign(Id(i),Id(c))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 439))
+
+    def test_struct_method_return_type_mismatch(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "c",
+                    StructType(
+                        "Counter",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType("Counter", [], []),
+                                FuncDecl(
+                                    "reset",
+                                    [],
+                                    IntType(),
+                                    Block([Return(IntLiteral(1))]),
+                                ),
+                            )
+                        ],
+                    ),
+                    None,
+                ),
+                VarDecl(
+                    "i",
+                    InterfaceType("Resettable", [Prototype("reset", [], VoidType())]),
+                    None,
+                ),
+                FuncDecl(
+                    "main",
+                    [],
+                    VoidType(),
+                    Block([Assign(Id("i"), Id("c"))]),
+                ),
+            ]
+        )
+        expect = "Type Mismatch: Assign(Id(i),Id(c))\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 440))
