@@ -56,7 +56,7 @@ class PrimLit(Literal):
 
 @dataclass
 class Program(AST):
-    decl: List[Decl]
+    decl: list[Decl]
 
     def __str__(self):
         return "Program([" + ",".join(str(i) for i in self.decl) + "])"
@@ -80,8 +80,8 @@ class ParamDecl(Decl):
 @dataclass
 class VarDecl(Decl, BlockMember):
     varName: str
-    varType: Type  # None if there is no type
-    varInit: Expr  # None if there is no initialization
+    varType: Optional[Type]  # None if there is no type
+    varInit: Optional[Expr]  # None if there is no initialization
 
     def __str__(self):
         return (

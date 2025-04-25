@@ -7,8 +7,10 @@ from AST import (
     ConstDecl,
     Expr,
     FloatType,
+    FuncDecl,
     Id,
     IntType,
+    InterfaceType,
     StringType,
     StructType,
     Type,
@@ -20,6 +22,7 @@ from StaticError import (
     Constant,
     Function,
     Identifier,
+    Method,
     Parameter,
     Redeclared,
     TypeMismatch,
@@ -280,26 +283,6 @@ class StaticChecker(BaseVisitor, Utils):
         )
 
     @override
-    def visitFuncCall(self, ast, param) -> Type:
-        sym = self.lookup(ast.funName, param, lambda x: x.name)
-        if sym is None:
-            raise Undeclared(Function(), ast.funName)
-
-        if not isinstance(sym.mtype, MType):
-            raise TypeMismatch(ast)
-
-        func_type: MType = sym.mtype
-        if len(ast.args) != len(func_type.partype):
-            raise TypeMismatch(ast)
-
-        for arg, expected_type in zip(ast.args, func_type.partype):
-            arg_type = self.visit(arg, param)
-            if not self._isTypeCompatible(expected_type, arg_type):
-                raise TypeMismatch(ast)
-
-        return func_type.rettype
-
-    @override
     def visitIf(self, ast, param):
         cond_type = self.visit(ast.expr, param)
         if not isinstance(cond_type, BoolType):
@@ -451,3 +434,63 @@ class StaticChecker(BaseVisitor, Utils):
             raise TypeMismatch(ast)
 
         raise TypeMismatch(ast)
+
+    @override
+    def visitFuncCall(self, ast, param) -> Type:
+        sym = self.lookup(ast.funName, param, lambda x: x.name)
+        if sym is None:
+            raise Undeclared(Function(), ast.funName)
+
+        if not isinstance(sym.mtype, MType):
+            raise TypeMismatch(ast)
+
+        func_type: MType = sym.mtype
+        if len(ast.args) != len(func_type.partype):
+            raise TypeMismatch(ast)
+
+        for arg, expected_type in zip(ast.args, func_type.partype):
+            arg_type = self.visit(arg, param)
+            if not self._isTypeCompatible(expected_type, arg_type):
+                raise TypeMismatch(ast)
+
+        return func_type.rettype
+
+    @override
+    def visitMethCall(self, ast, param):
+        recv_type = self.visit(ast.receiver, param)
+
+        if not isinstance(recv_type, (StructType, InterfaceType)):
+            raise TypeMismatch(ast)
+
+        method_decl = None
+
+        if isinstance(recv_type, StructType):
+            for m in recv_type.methods:
+                if m.fun.name == ast.metName:
+                    method_decl = m.fun
+                    break
+        else:
+            for proto in recv_type.methods:
+                if proto.name == ast.metName:
+                    method_decl = proto
+                    break
+
+        if method_decl is None:
+            raise Undeclared(Method(), ast.metName)
+
+        if isinstance(method_decl, FuncDecl):
+            param_types = [p.parType for p in method_decl.params]
+            return_type = method_decl.retType
+        else:
+            param_types = method_decl.params
+            return_type = method_decl.retType
+
+        if len(ast.args) != len(param_types):
+            raise TypeMismatch(ast)
+
+        for arg, expected_type in zip(ast.args, param_types):
+            arg_type = self.visit(arg, param)
+            if not self._isTypeCompatible(expected_type, arg_type):
+                raise TypeMismatch(ast)
+
+        return return_type

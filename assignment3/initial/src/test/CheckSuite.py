@@ -13,6 +13,7 @@ from AST import (
     Break,
     ConstDecl,
     Continue,
+    Decl,
     FloatLiteral,
     FloatType,
     ForBasic,
@@ -24,11 +25,14 @@ from AST import (
     If,
     IntLiteral,
     IntType,
+    MethCall,
+    MethodDecl,
     ParamDecl,
     Program,
     Return,
     StringLiteral,
     StringType,
+    StructType,
     UnaryOp,
     VarDecl,
     VoidType,
@@ -468,3 +472,29 @@ class CheckSuite(TestCase):
         )
         expect = "Type Mismatch: UnaryOp(-,Id(s))\n"
         self.assertTrue(TestChecker.test(input_ast, expect, 427))
+
+    def test_method_call_success(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "c",
+                    StructType(
+                        "Counter",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType("Counter", [], []),
+                                FuncDecl("reset", [], VoidType(), Block([])),
+                            )
+                        ],
+                    ),
+                    None,
+                ),
+                FuncDecl(
+                    "main", [], VoidType(), Block([MethCall(Id("c"), "reset", [])])
+                ),
+            ],
+        )
+        expect = ""
+        self.assertTrue(TestChecker.test(input_ast, expect, 428))
