@@ -170,6 +170,18 @@ class StaticChecker(BaseVisitor, Utils):
         return VoidType()
 
     @override
+    def visitStructLiteral(self, ast, param) -> StructType:
+        seen = set()
+        fields = []
+        for label, expr in ast.elements:
+            if label in seen:
+                raise Redeclared(Field(), label)
+            seen.add(label)
+            field_type = self.visit(expr, param)
+            fields.append((label, field_type))
+        return StructType(ast.name, fields, [])
+
+    @override
     def visitArrayLiteral(self, ast, param) -> ArrayType:
         expected_type = self.visit(ast.eleType, param)
 
