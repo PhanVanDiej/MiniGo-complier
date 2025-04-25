@@ -36,6 +36,7 @@ from AST import (
     Return,
     StringLiteral,
     StringType,
+    StructLiteral,
     StructType,
     UnaryOp,
     VarDecl,
@@ -829,3 +830,80 @@ class CheckSuite(TestCase):
         )
         expect = "Type Mismatch: Assign(Id(i),Id(c))\n"
         self.assertTrue(TestChecker.test(input_ast, expect, 440))
+
+    def test_method_redeclaration(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "c",
+                    StructType(
+                        "Counter",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType("Counter", [], []),
+                                FuncDecl("reset", [], VoidType(), Block([])),
+                            ),
+                            MethodDecl(
+                                "this",
+                                StructType("Counter", [], []),
+                                FuncDecl("reset", [], VoidType(), Block([])),
+                            ),
+                        ],
+                    ),
+                    None,
+                )
+            ]
+        )
+        expect = "Redeclared Method: reset\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 441))
+
+    def test_method_decl_redeclared_in_struct(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "c",
+                    StructType(
+                        "Counter",
+                        [],
+                        [
+                            MethodDecl(
+                                "self",
+                                StructType("Counter", [], []),
+                                FuncDecl("reset", [], VoidType(), Block([])),
+                            ),
+                            MethodDecl(
+                                "self",
+                                StructType("Counter", [], []),
+                                FuncDecl("reset", [], VoidType(), Block([])),
+                            ),
+                        ],
+                    ),
+                    None,
+                ),
+                FuncDecl("main", [], VoidType(), Block([])),
+            ]
+        )
+        expect = "Redeclared Method: reset\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 442))
+
+    def test_method_decl_redeclared_in_interface(self):
+        input_ast = Program(
+            [
+                VarDecl(
+                    "i",
+                    InterfaceType(
+                        "ICounter",
+                        [
+                            Prototype("reset", [], VoidType()),
+                            Prototype("reset", [], VoidType()),
+                        ],
+                    ),
+                    None,
+                ),
+                FuncDecl("main", [], VoidType(), Block([])),
+            ]
+        )
+        expect = "Redeclared Prototype: reset\n"
+        self.assertTrue(TestChecker.test(input_ast, expect, 443))

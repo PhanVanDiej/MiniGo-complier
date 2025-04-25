@@ -106,6 +106,9 @@ class StaticChecker(BaseVisitor, Utils):
         if res is not None:
             raise Redeclared(Variable(), ast.varName)
 
+        if ast.varType is not None:
+            ast.varType = self.visit(ast.varType, param)
+
         if ast.varInit is None:
             return Symbol(ast.varName, ast.varType, None)
 
@@ -585,3 +588,19 @@ class StaticChecker(BaseVisitor, Utils):
             local_methods.append(proto_sym)
 
         return InterfaceType(ast.name, ast.methods)
+
+    @override
+    def visitMethodDecl(self, ast, param):
+        method_sym = Symbol(
+            ast.fun.name, MType([p.parType for p in ast.fun.params], ast.fun.retType)
+        )
+
+        local_scope = [method_sym]
+        for p in ast.fun.params:
+            if self.lookup(p.parName, local_scope, lambda x: x.name):
+                raise Redeclared(Parameter(), p.parName)
+            local_scope.insert(0, Symbol(p.parName, p.parType))
+
+        self.visit(ast.fun.body, local_scope + param)
+
+        return method_sym

@@ -99,7 +99,7 @@ class VarDecl(Decl, BlockMember):
 @dataclass
 class ConstDecl(Decl, BlockMember):
     conName: str
-    conType: Type  # None if there is no type
+    conType: Optional[Type]  # None if there is no type
     iniExpr: Expr
 
     def __str__(self):
@@ -400,7 +400,7 @@ class Continue(Stmt):
 
 @dataclass
 class Return(Stmt):
-    expr: Expr  # None if there is no expr
+    expr: Optional[Expr]  # None if there is no expr
 
     def __str__(self):
         return "Return(" + ("" if (self.expr is None) else str(self.expr)) + ")"
